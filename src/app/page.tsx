@@ -48,7 +48,7 @@ export default function Home() {
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-bold tracking-tight text-green-500">
-            {">>"}private_chat
+            {">"}shadow_chat
           </h1>
           <p>A private, self-destructing chat room.</p>
         </div>
