@@ -7,7 +7,7 @@ import { useRealtime } from "@/lib/realtime-client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const formatTimeRemaining = (seconds: number) => {
   const mins = Math.floor(seconds / 60);
@@ -17,25 +17,17 @@ const formatTimeRemaining = (seconds: number) => {
 };
 
 const RoomPage = () => {
-  const { roomId } = useParams<{ roomId: string }>();
   const router = useRouter();
 
   const username = useChatUsername(ANIME_NAMES);
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [copyStatus, setCopyStatus] = useState("COPY");
-  const [timeRemaining, setTimeRemaining] = useState<number | null>(300);
+  const params = useParams();
+  const roomId = params.roomId as string;
 
-  const { data: messages, refetch } = useQuery({
-    queryKey: ["messages", roomId],
-    queryFn: async () => {
-      const res = await client.messages.get({
-        query: { roomId },
-      });
-      return res.data;
-    },
-  });
+  const [copyStatus, setCopyStatus] = useState("COPY");
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
 
   const { data: ttlData } = useQuery({
     queryKey: ["ttl", roomId],
@@ -44,12 +36,48 @@ const RoomPage = () => {
       return res.data;
     },
   });
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (ttlData?.ttl !== undefined) setTimeRemaining(ttlData.ttl);
+  }, [ttlData]);
+
+  useEffect(() => {
+    if (timeRemaining === null || timeRemaining < 0) return;
+
+    if (timeRemaining === 0) {
+      router.push("/?destroyed=true");
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [timeRemaining, router]);
+
+  const { data: messages, refetch } = useQuery({
+    queryKey: ["messages", roomId],
+    queryFn: async () => {
+      const res = await client.messages.get({ query: { roomId } });
+      return res.data;
+    },
+  });
+
   const { mutate: sendMessage, isPending } = useMutation({
     mutationFn: async ({ text }: { text: string }) => {
       await client.messages.post(
         { sender: username, text },
         { query: { roomId } },
       );
+
       setInput("");
     },
   });
@@ -61,33 +89,25 @@ const RoomPage = () => {
       if (event === "chat.message") {
         refetch();
       }
+
       if (event === "chat.destroyed") {
         router.push("/?destroyed=true");
       }
     },
   });
-  const copyLink = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopyStatus("COPIED!");
-      setTimeout(() => setCopyStatus("COPY"), 2000);
-    } catch {
-      setCopyStatus("FAILED");
-      setTimeout(() => setCopyStatus("COPY"), 2000);
-    }
-  }, []);
 
-  // Self-destruct countdown
-  useEffect(() => {
-    if (timeRemaining === null) return;
-    if (timeRemaining <= 0) return;
+  const { mutate: destroyRoom } = useMutation({
+    mutationFn: async () => {
+      await client.room.delete(null, { query: { roomId } });
+    },
+  });
 
-    const timer = setInterval(() => {
-      setTimeRemaining((prev) => (prev !== null ? prev - 1 : null));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [timeRemaining]);
+  const copyLink = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url);
+    setCopyStatus("COPIED!");
+    setTimeout(() => setCopyStatus("COPY"), 2000);
+  };
 
   const isWarning = timeRemaining !== null && timeRemaining < 60;
 
@@ -130,7 +150,10 @@ const RoomPage = () => {
             </span>
           </div>
         </div>
-        <button className="text-xs bg-zinc-800 hover:bg-red-600 px-3 py-1.5 rounded text-zinc-400 hover:text-white font-bold  transition-all group flex items-center gap-2 disabled:opacity-50">
+        <button
+          onClick={() => destroyRoom()}
+          className="text-xs bg-zinc-800 hover:bg-red-600 px-3 py-1.5 rounded text-zinc-400 hover:text-white font-bold  transition-all group flex items-center gap-2 disabled:opacity-50"
+        >
           <span className="group-hover:animate-pulse">💣</span>
           DESTROY NOW
         </button>
@@ -186,7 +209,7 @@ const RoomPage = () => {
               }}
               autoFocus
               className="w-full bg-black border border-zinc-800 focus:border-zinc-700 focus:outline-none transition-colors text-zinc-100 placeholder:text-zinc-400
-             py-3 pl-8 pr-4 text-sm"
+              py-3 pl-8 pr-4 text-sm"
             />
           </div>
           <button

@@ -28,6 +28,21 @@ const room = new Elysia({ prefix: "/room" })
     {
       query: z.object({ roomId: z.string() }),
     },
+  )
+  .delete(
+    "/",
+    async ({ auth }) => {
+      await realtime
+        .channel(auth.roomId)
+        .emit("chat.destroyed", { isDestroyed: true });
+
+      await Promise.all([
+        redis.del(auth.roomId),
+        redis.del(`meta:${auth.roomId}`),
+        redis.del(`messages:${auth.roomId}`),
+      ]);
+    },
+    { query: z.object({ roomId: z.string() }) },
   );
 
 const messages = new Elysia({ prefix: "/messages" })
@@ -50,8 +65,6 @@ const messages = new Elysia({ prefix: "/messages" })
         roomId,
       };
 
-      // add message to history
-
       await redis.rpush(`messages:${roomId}`, {
         ...message,
         token: auth.token,
@@ -59,9 +72,11 @@ const messages = new Elysia({ prefix: "/messages" })
       await realtime.channel(roomId).emit("chat.message", message);
 
       const remaining = await redis.ttl(`meta:${roomId}`);
-      await redis.expire(`messages:${roomId}`, remaining);
-      await redis.expire(`history:${roomId}`, remaining);
-      await redis.expire(roomId, remaining);
+      await Promise.all([
+        redis.expire(`messages:${roomId}`, remaining),
+        redis.expire(`history:${roomId}`, remaining),
+        redis.expire(roomId, remaining),
+      ]);
     },
 
     {
@@ -89,9 +104,11 @@ const messages = new Elysia({ prefix: "/messages" })
     },
     { query: z.object({ roomId: z.string() }) },
   );
+
 const app = new Elysia({ prefix: "/api" }).use(room).use(messages);
 
 export const GET = app.fetch;
 export const POST = app.fetch;
+export const DELETE = app.fetch;
 
 export type App = typeof app;

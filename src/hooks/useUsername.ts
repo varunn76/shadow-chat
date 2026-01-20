@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { nanoid } from "nanoid";
 
 const STORAGE_KEY = "chat_username";
@@ -11,22 +11,16 @@ const generateUserName = (ANIME_NAMES: string[]) => {
 };
 
 export const useChatUsername = (ANIME_NAMES: string[]) => {
-  const [username, setUsername] = useState<string>("");
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const [username] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
 
     const stored = localStorage.getItem(STORAGE_KEY);
-
-    if (stored) {
-      setUsername(stored);
-      return;
-    }
+    if (stored) return stored;
 
     const generated = generateUserName(ANIME_NAMES);
     localStorage.setItem(STORAGE_KEY, generated);
-    setUsername(generated);
-  }, [ANIME_NAMES]);
+    return generated;
+  });
 
   return username;
 };
