@@ -166,7 +166,7 @@ const RoomPage = () => {
             </p>
           </div>
         )}
-        {messages?.message.map((msg) => (
+        {messages?.message.map((msg:any) => (
           <div key={msg.id} className="flex flex-col items-start">
             <div className="max-w-[80%] group">
               <div className="flex items-baseline gap-3 mb-1">

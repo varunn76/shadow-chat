@@ -3,18 +3,18 @@ import { ANIME_NAMES } from "@/constants";
 import { useChatUsername } from "@/hooks/useUsername";
 import { client } from "@/lib/client";
 import { useMutation } from "@tanstack/react-query";
-import { useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 
 const Home = ({
-  searchParams,
+  wasDestroyed,
+  error,
 }: {
-  searchParams: { destroyed?: string; error?: string };
+  wasDestroyed?: boolean;
+  error?: string | null;
 }) => {
   const router = useRouter();
   const username = useChatUsername(ANIME_NAMES);
-  const wasDestroyed = searchParams.destroyed === "true";
-  const error = searchParams.error;
+
   const { mutate: createRoom } = useMutation({
     mutationFn: async () => {
       const res = await client.room.create.post();
@@ -23,7 +23,6 @@ const Home = ({
       }
     },
   });
-
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">

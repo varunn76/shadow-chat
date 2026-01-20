@@ -3,7 +3,7 @@ import type { App } from "@/app/api/[[...slugs]]/route";
 
 const URI =
   process.env.NODE_ENV === "development"
-    ? process.env.DEV_URL!
-    : process.env.LIVE_URL!;
+    ? "http://localhost:3000"
+    : "https://shadow-chat-jade.vercel.app";
 
 export const client = treaty<App>(URI).api;
